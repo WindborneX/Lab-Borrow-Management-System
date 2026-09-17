@@ -21,6 +21,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -261,5 +262,52 @@ class BorrowServiceTest {
         ))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("借用记录不存在");
+    }
+
+    @Test
+    void listsBorrowRecordsByUserAndStatus() {
+        User user = userRepository.save(new User(
+                "20260001",
+                "张三",
+                UserRole.STUDENT
+        ));
+        User other = userRepository.save(new User(
+                "20260002",
+                "李四",
+                UserRole.STUDENT
+        ));
+        Equipment equipment = equipmentRepository.save(new Equipment(
+                "Jetson Nano",
+                "开发板",
+                null,
+                EquipmentStatus.BORROWED
+        ));
+        borrowRecordRepository.save(new BorrowRecord(
+                equipment.getId(),
+                user.getId(),
+                null
+        ));
+        borrowRecordRepository.save(new BorrowRecord(
+                equipment.getId(),
+                other.getId(),
+                null
+        ));
+
+        List<BorrowRecordResponse> result = borrowService.listBorrowRecords(
+                user.getId(),
+                BorrowStatus.BORROWING.getCode()
+        );
+
+        assertThat(result)
+                .singleElement()
+                .extracting(BorrowRecordResponse::userId)
+                .isEqualTo(user.getId());
+    }
+
+    @Test
+    void rejectsInvalidBorrowStatusFilter() {
+        assertThatThrownBy(() -> borrowService.listBorrowRecords(null, 9))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("借用状态参数无效");
     }
 }

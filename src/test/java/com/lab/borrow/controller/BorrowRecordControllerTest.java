@@ -19,6 +19,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -67,6 +68,19 @@ class BorrowRecordControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value(403))
                 .andExpect(jsonPath("$.message").value("只能归还本人借用的设备"));
+    }
+
+    @Test
+    void listsBorrowRecords() throws Exception {
+        given(borrowService.listBorrowRecords(1L, 0))
+                .willReturn(java.util.List.of(returnedRecordResponse()));
+
+        mockMvc.perform(get("/api/v1/borrow-records")
+                        .param("userId", "1")
+                        .param("status", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data[0].id").value(1));
     }
 
     private BorrowRecordResponse returnedRecordResponse() {

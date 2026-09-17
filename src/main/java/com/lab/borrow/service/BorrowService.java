@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
@@ -133,6 +134,22 @@ public class BorrowService {
         return BorrowRecordResponse.from(returnedRecord);
     }
 
+    public List<BorrowRecordResponse> listBorrowRecords(
+            Long userId,
+            Integer status
+    ) {
+        if (userId != null && userId <= 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "用户ID参数无效");
+        }
+
+        BorrowStatus borrowStatus = parseBorrowStatus(status);
+        return borrowRecordRepository
+                .search(userId, borrowStatus)
+                .stream()
+                .map(BorrowRecordResponse::from)
+                .toList();
+    }
+
     private void validateRequest(BorrowApplicationRequest request) {
         if (request == null) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "请求体不能为空");
@@ -166,6 +183,14 @@ public class BorrowService {
                     HttpStatus.FORBIDDEN,
                     "设备当前不可用"
             );
+        }
+    }
+
+    private BorrowStatus parseBorrowStatus(Integer status) {
+        try {
+            return BorrowStatus.fromCode(status);
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "借用状态参数无效");
         }
     }
 }

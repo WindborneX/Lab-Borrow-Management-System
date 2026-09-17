@@ -38,6 +38,9 @@ export const listEquipment = (query: EquipmentQuery) => {
   return request<Equipment[]>(`/equipment${queryString ? `?${queryString}` : ''}`)
 }
 
+export const getEquipment = (id: number) =>
+  request<Equipment>(`/equipment/${id}`)
+
 export const createEquipment = (payload: EquipmentCreatePayload) =>
   request<Equipment>('/equipment', {
     method: 'POST',

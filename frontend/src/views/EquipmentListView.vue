@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { nextTick, onMounted, reactive, ref } from 'vue'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Plus, Promotion, Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { createBorrowApplication } from '../api/borrow'
 import {
   createEquipment,
   listEquipment,
   type Equipment,
 } from '../api/equipment'
+import { getUserByStudentId } from '../api/users'
 
 type TagType = 'success' | 'warning' | 'info' | 'danger'
 
@@ -35,6 +37,11 @@ const dialogVisible = ref(false)
 const equipmentList = ref<Equipment[]>([])
 const formRef = ref<FormInstance>()
 
+const borrowSubmitting = ref(false)
+const borrowDialogVisible = ref(false)
+const borrowFormRef = ref<FormInstance>()
+const selectedEquipment = ref<Equipment | null>(null)
+
 const filters = reactive({
   name: '',
   category: '',
@@ -47,6 +54,11 @@ const form = reactive({
   description: '',
 })
 
+const borrowForm = reactive({
+  studentId: '',
+  expectReturnTime: '',
+})
+
 const rules: FormRules = {
   name: [
     { required: true, message: '请输入设备名称', trigger: 'blur' },
@@ -54,6 +66,13 @@ const rules: FormRules = {
   ],
   category: [
     { max: 50, message: '设备分类不能超过50个字符', trigger: 'blur' },
+  ],
+}
+
+const borrowRules: FormRules = {
+  studentId: [
+    { required: true, message: '请输入学号/工号', trigger: 'blur' },
+    { max: 20, message: '学号/工号不能超过20个字符', trigger: 'blur' },
   ],
 }
 
@@ -114,6 +133,52 @@ const submitCreate = async () => {
     ElMessage.error(getErrorMessage(error))
   } finally {
     submitting.value = false
+  }
+}
+
+const openBorrowDialog = (equipment: Equipment) => {
+  selectedEquipment.value = equipment
+  Object.assign(borrowForm, {
+    studentId: '',
+    expectReturnTime: '',
+  })
+  borrowDialogVisible.value = true
+
+  nextTick(() => {
+    borrowFormRef.value?.clearValidate()
+  })
+}
+
+const submitBorrow = async () => {
+  const valid = await borrowFormRef.value?.validate().catch(() => false)
+  if (!valid || !selectedEquipment.value) {
+    return
+  }
+
+  if (
+    borrowForm.expectReturnTime &&
+    new Date(borrowForm.expectReturnTime.replace(' ', 'T')).getTime() <= Date.now()
+  ) {
+    ElMessage.warning('预计归还时间必须晚于当前时间')
+    return
+  }
+
+  borrowSubmitting.value = true
+
+  try {
+    const user = await getUserByStudentId(borrowForm.studentId.trim())
+    await createBorrowApplication({
+      equipmentId: selectedEquipment.value.id,
+      userId: user.id,
+      expectReturnTime: borrowForm.expectReturnTime || undefined,
+    })
+    borrowDialogVisible.value = false
+    ElMessage.success('设备借用成功')
+    await loadEquipment()
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error))
+  } finally {
+    borrowSubmitting.value = false
   }
 }
 
@@ -196,6 +261,20 @@ onMounted(loadEquipment)
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="录入时间" width="180" />
+        <el-table-column label="操作" width="100" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              v-if="row.status === 0"
+              type="primary"
+              link
+              :icon="Promotion"
+              @click="openBorrowDialog(row)"
+            >
+              借用
+            </el-button>
+            <span v-else class="muted">-</span>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
   </section>
@@ -243,6 +322,52 @@ onMounted(loadEquipment)
       </el-button>
     </template>
   </el-dialog>
+
+  <el-dialog
+    v-model="borrowDialogVisible"
+    title="借用设备"
+    width="min(520px, calc(100vw - 32px))"
+    destroy-on-close
+  >
+    <el-form
+      ref="borrowFormRef"
+      :model="borrowForm"
+      :rules="borrowRules"
+      label-position="top"
+    >
+      <el-form-item label="设备">
+        <el-input :model-value="selectedEquipment?.name" disabled />
+      </el-form-item>
+      <el-form-item label="学号/工号" prop="studentId">
+        <el-input
+          v-model="borrowForm.studentId"
+          maxlength="20"
+          placeholder="请输入学号/工号"
+        />
+      </el-form-item>
+      <el-form-item label="预计归还时间" prop="expectReturnTime">
+        <el-date-picker
+          v-model="borrowForm.expectReturnTime"
+          type="datetime"
+          value-format="YYYY-MM-DD HH:mm:ss"
+          placeholder="请选择预计归还时间"
+          style="width: 100%"
+          clearable
+        />
+      </el-form-item>
+    </el-form>
+
+    <template #footer>
+      <el-button @click="borrowDialogVisible = false">取消</el-button>
+      <el-button
+        type="primary"
+        :loading="borrowSubmitting"
+        @click="submitBorrow"
+      >
+        确认借用
+      </el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
@@ -287,6 +412,10 @@ onMounted(loadEquipment)
 .table-wrap {
   width: 100%;
   overflow-x: auto;
+}
+
+.muted {
+  color: #94a3b8;
 }
 
 @media (max-width: 767px) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Box, Tickets } from '@element-plus/icons-vue'
+import { Box, Tickets, User } from '@element-plus/icons-vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
@@ -55,6 +55,12 @@ onBeforeUnmount(() => {
             <Tickets />
           </el-icon>
           <template #title>借用记录</template>
+        </el-menu-item>
+        <el-menu-item index="/users">
+          <el-icon>
+            <User />
+          </el-icon>
+          <template #title>用户管理</template>
         </el-menu-item>
       </el-menu>
     </el-aside>

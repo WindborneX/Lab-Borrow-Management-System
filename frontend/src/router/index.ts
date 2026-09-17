@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '../layouts/AppLayout.vue'
 import BorrowRecordsView from '../views/BorrowRecordsView.vue'
 import EquipmentListView from '../views/EquipmentListView.vue'
+import UsersView from '../views/UsersView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -25,6 +26,14 @@ const router = createRouter({
           component: BorrowRecordsView,
           meta: {
             title: '借用记录',
+          },
+        },
+        {
+          path: 'users',
+          name: 'users',
+          component: UsersView,
+          meta: {
+            title: '用户管理',
           },
         },
       ],

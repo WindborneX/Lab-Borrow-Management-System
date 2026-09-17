@@ -11,11 +11,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@DataJpaTest
+@DataJpaTest(properties = {
+        "spring.datasource.url="
+                + "jdbc:sqlite:file:user-service-test?mode=memory&cache=shared"
+                + "&busy_timeout=5000",
+        "spring.datasource.hikari.maximum-pool-size=1"
+})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class UserServiceTest {
 
@@ -23,16 +30,18 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     private UserService userService;
+    private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository);
+        passwordEncoder = new BCryptPasswordEncoder();
+        userService = new UserService(userRepository, passwordEncoder);
     }
 
     @Test
     void createsAndRetrievesUserById() {
         UserResponse created = userService.createUser(
-                new UserCreateRequest("20260001", "张三", 0)
+                new UserCreateRequest("20260001", "张三", "123456", 0)
         );
 
         UserResponse found = userService.getUser(created.id());
@@ -41,11 +50,18 @@ class UserServiceTest {
         assertThat(found.username()).isEqualTo("张三");
         assertThat(found.role()).isEqualTo(UserRole.STUDENT.getCode());
         assertThat(found.createdAt()).isNotNull();
+        assertThat(userRepository.findById(created.id()))
+                .get()
+                .extracting(user -> user.getPasswordHash())
+                .asString()
+                .isNotEqualTo("123456");
     }
 
     @Test
     void retrievesUserByStudentId() {
-        userService.createUser(new UserCreateRequest("ADMIN001", "管理员", 1));
+        userService.createUser(
+                new UserCreateRequest("ADMIN001", "管理员", "123456", 1)
+        );
 
         UserResponse found = userService.getUserByStudentId("ADMIN001");
 
@@ -55,10 +71,12 @@ class UserServiceTest {
 
     @Test
     void rejectsDuplicateStudentId() {
-        userService.createUser(new UserCreateRequest("20260001", "张三", 0));
+        userService.createUser(
+                new UserCreateRequest("20260001", "张三", "123456", 0)
+        );
 
         assertThatThrownBy(() -> userService.createUser(
-                new UserCreateRequest("20260001", "李四", 0)
+                new UserCreateRequest("20260001", "李四", "123456", 0)
         ))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT)
@@ -69,7 +87,7 @@ class UserServiceTest {
     @Test
     void rejectsInvalidRole() {
         assertThatThrownBy(() -> userService.createUser(
-                new UserCreateRequest("20260002", "李四", 9)
+                new UserCreateRequest("20260002", "李四", "123456", 9)
         ))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("用户角色参数无效");
@@ -78,7 +96,7 @@ class UserServiceTest {
     @Test
     void rejectsBlankUsername() {
         assertThatThrownBy(() -> userService.createUser(
-                new UserCreateRequest("20260003", "  ", 0)
+                new UserCreateRequest("20260003", "  ", "123456", 0)
         ))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("姓名不能为空");

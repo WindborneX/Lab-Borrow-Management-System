@@ -25,6 +25,9 @@ public class User {
     @Column(nullable = false, length = 50)
     private String username;
 
+    @Column(name = "password_hash")
+    private String passwordHash;
+
     @Convert(converter = UserRoleConverter.class)
     @Column(nullable = false)
     private UserRole role;
@@ -35,10 +38,20 @@ public class User {
     protected User() {
     }
 
-    public User(String studentId, String username, UserRole role) {
+    public User(
+            String studentId,
+            String username,
+            String passwordHash,
+            UserRole role
+    ) {
         this.studentId = studentId;
         this.username = username;
+        this.passwordHash = passwordHash;
         this.role = role;
+    }
+
+    public User(String studentId, String username, UserRole role) {
+        this(studentId, username, null, role);
     }
 
     @PrePersist
@@ -61,6 +74,10 @@ public class User {
 
     public String getUsername() {
         return username;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
     }
 
     public UserRole getRole() {

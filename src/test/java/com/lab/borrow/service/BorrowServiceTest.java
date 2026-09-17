@@ -26,7 +26,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@DataJpaTest
+@DataJpaTest(properties = {
+        "spring.datasource.url="
+                + "jdbc:sqlite:file:borrow-service-test?mode=memory&cache=shared"
+                + "&busy_timeout=5000",
+        "spring.datasource.hikari.maximum-pool-size=1"
+})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class BorrowServiceTest {
 

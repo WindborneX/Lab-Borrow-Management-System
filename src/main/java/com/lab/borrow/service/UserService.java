@@ -7,6 +7,7 @@ import com.lab.borrow.entity.UserRole;
 import com.lab.borrow.exception.BusinessException;
 import com.lab.borrow.repository.UserRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,9 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder
+    ) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public UserResponse getUser(Long id) {
@@ -59,6 +65,7 @@ public class UserService {
                 "姓名",
                 50
         );
+        String password = normalizePassword(request.password());
         UserRole role = parseRole(request.role());
 
         if (userRepository.existsByStudentId(studentId)) {
@@ -68,7 +75,12 @@ public class UserService {
             );
         }
 
-        User user = new User(studentId, username, role);
+        User user = new User(
+                studentId,
+                username,
+                passwordEncoder.encode(password),
+                role
+        );
         return UserResponse.from(userRepository.save(user));
     }
 
@@ -104,5 +116,18 @@ public class UserService {
             );
         }
         return normalized;
+    }
+
+    private String normalizePassword(String value) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "密码不能为空");
+        }
+        if (value.length() < 6) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "密码不能少于6个字符");
+        }
+        if (value.length() > 72) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "密码不能超过72个字符");
+        }
+        return value;
     }
 }
